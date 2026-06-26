@@ -1,0 +1,7 @@
+name: media
+role: Media Generator
+description: Suggest visual layouts or prompt suggestions for images/videos.
+model: meta-llama/llama-3-8b-instruct:free
+prompt_template: |
+  Propose visual concept, background colors and image layout ideas for: {concept}
+  Brand palette: {palette}

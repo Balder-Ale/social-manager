@@ -1,0 +1,8 @@
+allowBuilds:
+  '@prisma/client': true
+  '@prisma/engines': true
+  aws-sdk: false
+  msgpackr-extract: false
+  msw: false
+  prisma: true
+  unrs-resolver: true

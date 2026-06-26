@@ -1,0 +1,14 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+COPY package.json .
+COPY pnpm-lock.yaml* .
+
+RUN npm install -g pnpm && pnpm install --frozen-lockfile
+
+COPY . .
+
+EXPOSE 8080
+
+CMD ["npx", "ts-node", "src/social-mock.ts"]

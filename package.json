@@ -1,0 +1,15 @@
+{
+  "name": "social-manager",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "npx pnpm --dir src run dev",
+    "seed": "npx pnpm --dir src run seed",
+    "generate": "npx prisma generate --schema=prisma/schema.prisma --config=prisma/prisma.config.ts",
+    "migrate": "npx prisma migrate dev --name init"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "prisma": "^5.22.0"
+  }
+}

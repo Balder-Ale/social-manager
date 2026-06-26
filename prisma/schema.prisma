@@ -1,0 +1,93 @@
+// Prisma schema for Social Manager
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id             String          @id @default(uuid())
+  name           String
+  users          User[]
+  brands         Brand[]
+  socialAccounts SocialAccount[]
+  createdAt      DateTime        @default(now())
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId  String
+  role      String
+  language  String?
+  createdAt DateTime @default(now())
+}
+
+model Brand {
+  id          String   @id @default(uuid())
+  name        String
+  tone        String?
+  palette     String?
+  paletteJson Json?
+  fontsJson   Json?
+  logoUrl     String?
+  guidelines  String?
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  tenantId    String
+  posts       Post[]
+  createdAt   DateTime @default(now())
+}
+
+model Post {
+  id        String    @id @default(uuid())
+  title     String
+  content   String?
+  mediaUrl  String?
+  status    String    @default("draft")
+  brand     Brand     @relation(fields: [brandId], references: [id])
+  brandId   String
+  workflow  Workflow? @relation("PostWorkflow")
+  assets    Asset[]   @relation("PostAssets")
+  createdAt DateTime  @default(now())
+}
+
+model Workflow {
+  id        String   @id @default(uuid())
+  post      Post     @relation("PostWorkflow", fields: [postId], references: [id])
+  postId    String   @unique
+  steps     Json
+  result    Json?
+  createdAt DateTime @default(now())
+}
+
+model Asset {
+  id        String   @id @default(uuid())
+  post      Post?    @relation("PostAssets", fields: [postId], references: [id])
+  postId    String?
+  url       String
+  type      String
+  createdAt DateTime @default(now())
+}
+
+model SocialAccount {
+  id             String    @id @default(uuid())
+  platform       String // 'instagram' | 'facebook' | 'tiktok'
+  accountName    String // display name from the social platform
+  accountId      String // platform user/page ID
+  accessToken    String
+  refreshToken   String?
+  tokenExpiresAt DateTime?
+  tenant         Tenant    @relation(fields: [tenantId], references: [id])
+  tenantId       String
+  metadata       Json? // extra data: profile pic, follower count, etc.
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([platform, accountId, tenantId])
+}

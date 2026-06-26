@@ -1,0 +1,6 @@
+name: optimizer
+role: Platform Optimizer
+description: Optimize copy length, format, and hashtags for Instagram, Facebook, and TikTok.
+model: meta-llama/llama-3-8b-instruct:free
+prompt_template: |
+  Optimize this caption for {platforms}: {caption}

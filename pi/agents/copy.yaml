@@ -1,0 +1,7 @@
+name: copy
+role: Copywriter
+description: Write the caption copy based on the selected hook and brand guidelines.
+model: meta-llama/llama-3-8b-instruct:free
+prompt_template: |
+  Write copy for a post using this hook: {hook}
+  Follow these guidelines: {guidelines}

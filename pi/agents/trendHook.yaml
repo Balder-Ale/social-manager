@@ -1,0 +1,7 @@
+name: trendHook
+role: Trend Analyzer & Hook Generator
+description: Analyze viral trends and generate hook ideas.
+model: meta-llama/llama-3-8b-instruct:free
+prompt_template: |
+  Analyze current social trends on topic: {topic}
+  Generate 3 hooks matching brand tone: {tone}

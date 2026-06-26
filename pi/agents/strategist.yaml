@@ -1,0 +1,6 @@
+name: strategist
+role: Growth Strategist
+description: Propose post schedule and tactical playbook details.
+model: meta-llama/llama-3-8b-instruct:free
+prompt_template: |
+  Create growth tips for a brand in the {industry} industry.

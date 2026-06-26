@@ -1,0 +1,8 @@
+name: qa
+role: Quality Assurance
+description: Check content compliance against brand guidelines and tone rules.
+model: meta-llama/llama-3-8b-instruct:free
+prompt_template: |
+  Review copy: {caption}
+  Does it comply with brand tone "{tone}" and rules: {guidelines}?
+  Provide compliance score (0-100) and remarks.
