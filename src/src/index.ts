@@ -15,6 +15,26 @@ const port = process.env.PORT || 4001;
 // In-memory OpenRouter API key (can be set at runtime via Settings UI)
 let runtimeOpenRouterKey: string | null = null;
 
+// ─── Tenant middleware ───────────────────────────────────────────────
+// Extract X-Tenant-Id from request header. Falls back to first tenant.
+app.use(async (req: any, _res, next) => {
+  const headerTenantId = req.headers['x-tenant-id'] as string | undefined;
+
+  if (headerTenantId) {
+    // Verify tenant exists
+    const tenant = await prisma.tenant.findUnique({ where: { id: headerTenantId } });
+    if (tenant) {
+      req.currentTenantId = tenant.id;
+      return next();
+    }
+  }
+
+  // Fallback: first tenant in DB
+  const firstTenant = await prisma.tenant.findFirst({ orderBy: { createdAt: 'asc' } });
+  req.currentTenantId = firstTenant?.id || null;
+  next();
+});
+
 // Helper: resolve the active OpenRouter key
 function getOpenRouterKey(): string | null {
   return runtimeOpenRouterKey || process.env.OPENROUTER_API_KEY || null;
@@ -47,11 +67,58 @@ app.get('/', (req, res) => {
   res.json({ status: 'ok', message: 'Social-Manager Backend is running' });
 });
 
-// GET /api/brands
-// Lists all brands
-app.get('/api/brands', async (req, res) => {
+// GET /api/tenants
+// Lists all tenants (for tenant switcher)
+app.get('/api/tenants', async (req: any, res) => {
   try {
+    const tenants = await prisma.tenant.findMany({
+      select: { id: true, name: true, createdAt: true },
+      orderBy: { createdAt: 'asc' }
+    });
+    return res.json(tenants);
+  } catch (error: any) {
+    console.error('Error in GET /api/tenants:', error);
+    return res.status(500).json({ error: 'Internal server error', details: error.message });
+  }
+});
+
+// POST /api/tenants
+// Creates a new tenant
+app.post('/api/tenants', async (req, res) => {
+  const { name } = req.body;
+  if (!name) {
+    return res.status(400).json({ error: 'Missing required field: name' });
+  }
+  try {
+    const tenant = await prisma.tenant.create({ data: { name } });
+    console.log(`[Tenants API] Created tenant: ${tenant.name} (${tenant.id})`);
+    return res.status(201).json(tenant);
+  } catch (error: any) {
+    console.error('Error in POST /api/tenants:', error);
+    return res.status(500).json({ error: 'Internal server error', details: error.message });
+  }
+});
+
+// DELETE /api/tenants/:id
+// Deletes a tenant (and its brands, accounts)
+app.delete('/api/tenants/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await prisma.tenant.delete({ where: { id } });
+    return res.json({ status: 'ok' });
+  } catch (error: any) {
+    console.error('Error in DELETE /api/tenants:', error);
+    return res.status(500).json({ error: 'Internal server error', details: error.message });
+  }
+});
+
+// GET /api/brands
+// Lists all brands for the current tenant
+app.get('/api/brands', async (req: any, res) => {
+  try {
+    const where = req.currentTenantId ? { tenantId: req.currentTenantId } : {};
     const brands = await prisma.brand.findMany({
+      where,
       select: {
         id: true,
         name: true,
@@ -69,22 +136,22 @@ app.get('/api/brands', async (req, res) => {
 });
 
 // POST /api/brands
-// Creates a new brand entry
-app.post('/api/brands', async (req, res) => {
-  const { name, tone, palette, guidelines, tenantId, logoUrl } = req.body;
+// Creates a new brand entry for the current tenant
+app.post('/api/brands', async (req: any, res) => {
+  const { name, tone, palette, guidelines, logoUrl } = req.body;
 
   if (!name) {
     return res.status(400).json({ error: 'Missing required field: name' });
   }
 
   try {
-    // Find or default to first tenant
-    let tenantRecord = tenantId
-      ? await prisma.tenant.findUnique({ where: { id: tenantId } })
-      : await prisma.tenant.findFirst();
-
-    if (!tenantRecord) {
-      return res.status(400).json({ error: 'No tenant found. Create a tenant first.' });
+    let tenantId = req.currentTenantId;
+    if (!tenantId) {
+      const firstTenant = await prisma.tenant.findFirst({ orderBy: { createdAt: 'asc' } });
+      if (!firstTenant) {
+        return res.status(400).json({ error: 'No tenant found. Create a tenant first.' });
+      }
+      tenantId = firstTenant.id;
     }
 
     const brand = await prisma.brand.create({
@@ -94,7 +161,7 @@ app.post('/api/brands', async (req, res) => {
         paletteJson: Array.isArray(palette) ? palette : null,
         guidelines: guidelines || null,
         logoUrl: logoUrl || null,
-        tenant: { connect: { id: tenantRecord.id } }
+        tenant: { connect: { id: tenantId } }
       }
     });
 
@@ -322,8 +389,14 @@ app.get('/api/auth/:platform/callback', async (req, res) => {
   try {
     const tokenData = await exchangeCode(platform, code);
 
-    // Find or default to first tenant
-    const tenantRecord = await prisma.tenant.findFirst();
+    // Use tenant from middleware
+    const tenantId = (req as any).currentTenantId;
+    let tenantRecord: any;
+    if (tenantId) {
+      tenantRecord = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    } else {
+      tenantRecord = await prisma.tenant.findFirst();
+    }
     if (!tenantRecord) {
       return res.status(400).json({ error: 'No tenant found' });
     }
@@ -367,10 +440,16 @@ app.get('/api/auth/:platform/callback', async (req, res) => {
 });
 
 // GET /api/auth/accounts
-// Lists all connected social accounts (without exposing tokens)
-app.get('/api/auth/accounts', async (req, res) => {
+// Lists all connected social accounts for the current tenant
+app.get('/api/auth/accounts', async (req: any, res) => {
   try {
-    const tenantRecord = await prisma.tenant.findFirst();
+    const tenantId = req.currentTenantId;
+    let tenantRecord;
+    if (tenantId) {
+      tenantRecord = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    } else {
+      tenantRecord = await prisma.tenant.findFirst();
+    }
     if (!tenantRecord) {
       return res.json([]);
     }

@@ -2,6 +2,11 @@
 
 import { useState, ChangeEvent, FormEvent } from 'react';
 
+function getTenantHeaders(): Record<string, string> {
+  const tenantId = typeof window !== 'undefined' ? localStorage.getItem('social-manager-tenant-id') : null;
+  return tenantId ? { 'X-Tenant-Id': tenantId, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
+}
+
 export default function BrandLab() {
   const [brandName, setBrandName] = useState('');
   const [tone, setTone] = useState('');
@@ -29,14 +34,13 @@ export default function BrandLab() {
       tone,
       palette: palette.filter(c => c),
       guidelines,
-      logoUrl: null,
-      tenantId: null
+      logoUrl: null
     };
 
     try {
-      const res = await fetch('http://localhost:4001/api/brands', {
+      const res = await fetch('/api/brands', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getTenantHeaders(),
         body: JSON.stringify(payload)
       });
 

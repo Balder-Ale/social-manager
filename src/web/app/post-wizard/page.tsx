@@ -20,6 +20,15 @@ type Step = 1 | 2 | 3;
 const PLATFORMS = ['Instagram', 'Facebook', 'TikTok'] as const;
 const FORMATS = ['Reel', 'Carousel', 'Story', 'Tweet', 'Short'] as const;
 
+function getTenantHeaders(): Record<string, string> {
+  const tenantId = typeof window !== 'undefined'
+    ? localStorage.getItem('social-manager-tenant-id')
+    : null;
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (tenantId) headers['X-Tenant-Id'] = tenantId;
+  return headers;
+}
+
 export default function NewPostWizard() {
   const [step, setStep] = useState<Step>(1);
 
@@ -43,7 +52,7 @@ export default function NewPostWizard() {
 
   // Load brands on mount
   useEffect(() => {
-    fetch('http://localhost:4001/api/brands')
+    fetch('/api/brands', { headers: getTenantHeaders() })
       .then((res) => res.json())
       .then((data) => {
         setBrands(Array.isArray(data) ? data : []);
@@ -79,9 +88,9 @@ export default function NewPostWizard() {
     setTrendsResult(null);
 
     try {
-      const res = await fetch('http://localhost:4001/api/analyze/trends', {
+      const res = await fetch('/api/analyze/trends', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getTenantHeaders(),
         body: JSON.stringify({
           brandId: selectedBrandId,
           topic: topic || undefined
