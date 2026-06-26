@@ -37,7 +37,7 @@
 | # | Task | Descrizione | Priorità |
 |---|------|------------|----------|
 | 18 | **Abilitare `image‑gen`** sub‑agent | Installare Ollama, configurare `ENABLE_IMAGE_GEN=true`, aggiungere UI per scegliere modello immagine. | low |
-| 19 | **Deploy su Fly.io (free tier)** | Creare app Fly.io, impostare secret (OpenRouter, R2), `fly deploy`. | high |
+| 19 | **Deploy su Fly.io (free tier)** | Creare app Fly.io, impostare secret (OpenRouter, R2), `fly deploy`. 🔧 files creati: `fly.toml`, `Dockerfile.fly`, `.env.production`. | high |
 | 20 | **Passare a Cloudflare R2** | Aggiornare `.env` con `STORAGE_PROVIDER=r2` e credenziali; test upload/download. | medium |
 | 21 | **Gestione multi‑brand (prod)** | UI per switch tenant, isolamento DB (schema o `tenant_id`). | high |
 | 22 | **Cache trend + hook** (Redis) | Implementare TTL 10 min, `stale‑while‑revalidate`. | medium |
