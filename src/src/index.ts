@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import axios from 'axios';
 import crypto from 'crypto';
 import { buildAuthUrl, exchangeCode } from './services/oauth';
+import { getCached, setCache, buildTrendCacheKey } from '../utils/cache';
 
 // Load env variables
 dotenv.config();
@@ -198,12 +199,33 @@ app.post('/api/analyze/trends', async (req, res) => {
 
     console.log(`[Trends API] Analyzing trends for brand "${brandName}" on topic "${topic || 'General'}"`);
 
+    // ── Cache check (stale-while-revalidate) ────────────────────────
+    const cacheKey = buildTrendCacheKey(brandId, topic);
+    const cached = await getCached<any>(cacheKey);
+
+    if (cached.data && !cached.stale) {
+      console.log('[Trends API] Returning cached response');
+      return res.json({ ...cached.data, source: cached.data.source || 'cache' });
+    }
+
+    // Stale: serve stale + revalidate in background
+    if (cached.data && cached.stale) {
+      console.log('[Trends API] Serving stale cache, revalidating in background');
+      // Fire-and-forget revalidate, response returns stale data immediately
+      revalidateTrends(cacheKey, brandName, tone, guidelines, topic, getOpenRouterKey())
+        .then((fresh) => { if (fresh) setCache(cacheKey, fresh); })
+        .catch(() => {});
+      return res.json({ ...cached.data, source: 'cache-stale' });
+    }
+
     const openrouterApiKey = getOpenRouterKey();
 
     // Check if we have an OpenRouter API key
     if (!openrouterApiKey || openrouterApiKey.includes('YOUR_OPENROUTER_API_KEY')) {
       console.warn('[Trends API] OpenRouter API key not configured. Returning mock response.');
-      return res.json(getMockTrends(brandName, tone, topic));
+      const mockData = getMockTrends(brandName, tone, topic);
+      await setCache(cacheKey, mockData).catch(() => {});
+      return res.json(mockData);
     }
 
     // Call OpenRouter
@@ -249,17 +271,24 @@ app.post('/api/analyze/trends', async (req, res) => {
       cleanJson = cleanJson.trim();
 
       const result = JSON.parse(cleanJson);
-      return res.json({
+      const responseData = {
         brandId,
         topic,
         trends: result.trends || [],
         hooks: result.hooks || [],
         source: 'openrouter'
-      });
+      };
+
+      // Store in cache (non-blocking)
+      setCache(cacheKey, responseData).catch(() => {});
+
+      return res.json(responseData);
 
     } catch (llmError: any) {
       console.error('[Trends API] OpenRouter call failed, falling back to mock:', llmError.message || llmError);
-      return res.json(getMockTrends(brandName, tone, topic));
+      const mockData = getMockTrends(brandName, tone, topic);
+      await setCache(cacheKey, mockData).catch(() => {});
+      return res.json(mockData);
     }
 
   } catch (error: any) {
@@ -515,6 +544,62 @@ function getMockTrends(brandName: string, tone: string, topic?: string) {
       `Hook C (Direct value): "Want to master ${currentTopic}? Here are 3 tips from ${brandName}."`
     ],
     source: 'mock'
+  };
+}
+
+/**
+ * Background revalidation for stale cache entries.
+ * Fetches fresh trends from OpenRouter and stores result in cache.
+ */
+async function revalidateTrends(
+  cacheKey: string,
+  brandName: string,
+  tone: string,
+  guidelines: string,
+  topic: string | undefined,
+  apiKey: string | null
+) {
+  if (!apiKey || apiKey.includes('YOUR_OPENROUTER_API_KEY')) {
+    return getMockTrends(brandName, tone, topic);
+  }
+
+  const response = await axios.post(
+    'https://openrouter.ai/api/v1/chat/completions',
+    {
+      model: 'nvidia/nemotron-3-super:free',
+      messages: [
+        {
+          role: 'system',
+          content: `You are an expert AI social media strategist. Analyze trends for the brand "${brandName}" with a tone of "${tone}". Brand guidelines: ${guidelines}`
+        },
+        {
+          role: 'user',
+          content: `Suggest 3 viral trends and 3 hook variations for a social media post about: "${topic || 'current digital marketing trends'}". Output the response as a valid JSON object with the keys "trends" (array of strings) and "hooks" (array of strings). Do not include any markdown format tags like \`\`\`json or explanation before or after. Output pure JSON only.`
+        }
+      ]
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      timeout: 30000
+    }
+  );
+
+  let cleanJson = response.data.choices[0].message.content.trim();
+  if (cleanJson.startsWith('```json')) cleanJson = cleanJson.substring(7);
+  if (cleanJson.startsWith('```')) cleanJson = cleanJson.substring(3);
+  if (cleanJson.endsWith('```')) cleanJson = cleanJson.substring(0, cleanJson.length - 3);
+  cleanJson = cleanJson.trim();
+
+  const result = JSON.parse(cleanJson);
+  return {
+    brandId: cacheKey,
+    topic,
+    trends: result.trends || [],
+    hooks: result.hooks || [],
+    source: 'openrouter'
   };
 }
 
