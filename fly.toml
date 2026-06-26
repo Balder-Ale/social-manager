@@ -1,6 +1,6 @@
 # fly.toml – Social Manager Backend
 # Deploy: fly deploy
-app = "social-manager"
+app = "social-manager2026"
 primary_region = "ams"
 
 [build]
