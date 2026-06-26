@@ -28,6 +28,7 @@
 |14 | UI di **Settings** | Pagina per inserire chiave OpenRouter (localStorage + backend runtime) + sezione Connected Social Accounts. |
 |15 | Integrazione **OAuth reale** per Instagram/Facebook/TikTok | Model `SocialAccount`, migrazione DB, servizio OAuth, API routes (authorize, callback, accounts CRUD), UI connessione. |
 |16 | **Unit / Integration tests** (Jest) | 32 test su 4 suite: oauth, routes API, seed-demo, demo-flow. |
+| 17 | **CI/CD** – GitHub Actions (lint + test) | Git init, primo commit, `.github/workflows/ci.yml` creato. |
 
 ---
 
@@ -35,7 +36,6 @@
 
 | # | Task | Descrizione | Priorità |
 |---|------|------------|----------|
-| 17 | **CI/CD** – GitHub Actions (lint + test) | Workflow automatico su push. | medium |
 | 18 | **Abilitare `image‑gen`** sub‑agent | Installare Ollama, configurare `ENABLE_IMAGE_GEN=true`, aggiungere UI per scegliere modello immagine. | low |
 | 19 | **Deploy su Fly.io (free tier)** | Creare app Fly.io, impostare secret (OpenRouter, R2), `fly deploy`. | high |
 | 20 | **Passare a Cloudflare R2** | Aggiornare `.env` con `STORAGE_PROVIDER=r2` e credenziali; test upload/download. | medium |
