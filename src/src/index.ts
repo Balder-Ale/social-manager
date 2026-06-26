@@ -505,6 +505,116 @@ app.get('/api/auth/accounts', async (req: any, res) => {
   }
 });
 
+// ─── Growth Playbook ────────────────────────────────────────────────
+
+// POST /api/analyze/playbook
+// Generates a growth playbook using OpenRouter (strategist agent)
+app.post('/api/analyze/playbook', async (req: any, res) => {
+  const { brandId, industry } = req.body;
+
+  if (!brandId) {
+    return res.status(400).json({ error: 'Missing brandId' });
+  }
+
+  try {
+    const brand = await prisma.brand.findUnique({ where: { id: brandId } });
+    if (!brand) {
+      return res.status(404).json({ error: 'Brand not found' });
+    }
+
+    const brandName = brand.name;
+    const tone = brand.tone || 'friendly';
+    const activeIndustry = industry || 'social media';
+
+    const apiKey = getOpenRouterKey();
+
+    if (!apiKey || apiKey.includes('YOUR_OPENROUTER_API_KEY')) {
+      // Return mock playbook
+      return res.json({
+        brand: brandName,
+        industry: activeIndustry,
+        executiveSummary: `Growth strategy for ${brandName} in the ${activeIndustry} space.`,
+        weeklySchedule: [
+          { day: 'Monday', type: 'Educational', content: `Share industry tips related to ${activeIndustry}` },
+          { day: 'Wednesday', type: 'Engagement', content: 'Polls, Q&A, user-generated content' },
+          { day: 'Friday', type: 'Promotional', content: `Highlight ${brandName} products/services` }
+        ],
+        tacticalTips: [
+          `Use ${tone} tone across all platforms for consistency`,
+          'Post at peak engagement times: 9am-11am and 6pm-8pm',
+          'Repurpose top-performing content into different formats'
+        ],
+        kpi: ['Follower growth +15%', 'Engagement rate >3%', 'Post reach +25%'],
+        source: 'mock'
+      });
+    }
+
+    const response = await axios.post(
+      'https://openrouter.ai/api/v1/chat/completions',
+      {
+        model: 'meta-llama/llama-3-8b-instruct:free',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a growth strategist. Produce concise, actionable playbooks for social media brands.'
+          },
+          {
+            role: 'user',
+            content: `Create a growth playbook for the brand "${brandName}" (tone: ${tone}) in the ${activeIndustry} industry. Output valid JSON with keys: "executiveSummary" (string), "weeklySchedule" (array of {day, type, content}), "tacticalTips" (array of strings), "kpi" (array of strings). No markdown.`
+          }
+        ]
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 30000
+      }
+    );
+
+    let responseText = response.data.choices[0].message.content.trim();
+    if (responseText.startsWith('```json')) responseText = responseText.substring(7);
+    if (responseText.startsWith('```')) responseText = responseText.substring(3);
+    if (responseText.endsWith('```')) responseText = responseText.substring(0, responseText.length - 3);
+
+    const result = JSON.parse(responseText.trim());
+    return res.json({
+      brand: brandName,
+      industry: activeIndustry,
+      ...result,
+      source: 'openrouter'
+    });
+
+  } catch (error: any) {
+    console.error('[Playbook API] Error:', error);
+    return res.status(500).json({ error: 'Failed to generate playbook', details: error.message });
+  }
+});
+
+// GET /api/analyze/playbook/brands/:brandId
+// Returns the latest cached playbook or triggers generation
+app.get('/api/analyze/playbook/brands/:brandId', async (req: any, res) => {
+  const { brandId } = req.params;
+  // Simple pass-through: triggers a new generation
+  // In production, cache the playbook by brandId
+  try {
+    const brand = await prisma.brand.findUnique({ where: { id: brandId } });
+    if (!brand) return res.status(404).json({ error: 'Brand not found' });
+
+    // Forward to POST logic via internal request
+    const axios = require('axios');
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const origin = `${protocol}://${host}`;
+    const playbookRes = await axios.post(`${origin}/api/analyze/playbook`, { brandId });
+    return res.json(playbookRes.data);
+  } catch (error: any) {
+    console.error('[Playbook API] GET error:', error);
+    return res.status(500).json({ error: 'Failed to get playbook' });
+  }
+});
+
 // DELETE /api/auth/accounts/:id
 // Disconnects (deletes) a social account
 app.delete('/api/auth/accounts/:id', async (req, res) => {

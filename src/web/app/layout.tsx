@@ -49,6 +49,9 @@ export default function RootLayout({
             <a href="/post-wizard" style={{ color: '#374151', textDecoration: 'none', fontSize: 14 }}>
               New Post
             </a>
+            <a href="/playbook" style={{ color: '#374151', textDecoration: 'none', fontSize: 14 }}>
+              Growth Playbook
+            </a>
             <a href="/settings" style={{ color: '#374151', textDecoration: 'none', fontSize: 14 }}>
               Settings
             </a>

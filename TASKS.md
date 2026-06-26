@@ -40,5 +40,5 @@
 | 19 | **Deploy su Fly.io (free tier)** | Creare app Fly.io, impostare secret (OpenRouter, R2), `fly deploy`. ✅ App live su https://social-manager2026.fly.dev/ (health OK, DB connesso) | high |
 | 20 | **Passare a Cloudflare R2** | Aggiornare `.env` con `STORAGE_PROVIDER=r2` e credenziali; test upload/download. ✅ `storage.ts` refactorizzato per supportare MinIO e R2. `.env.example` aggiornato con vars R2. | medium |
 | 21 | **Gestione multi-brand (prod)** | UI per switch tenant, isolamento DB (schema o `tenant_id`). ✅ Tenant middleware (`X-Tenant-Id` header), API CRUD tenants, tenant switcher UI nel layout, brand/oauth queries scoped. | high |
-| 22 | **Cache trend + hook** (Redis) | Implementare TTL 10 min, `stale‑while‑revalidate`. | medium |
+| 22 | **Cache trend + hook** (Redis) | Implementare TTL 10 min, `stale‑while‑revalidate`. ✅ `src/utils/cache.ts` creato, integrato in `/api/analyze/trends` con background refresh. | medium |
 | 23 | **Report “Growth Playbook”** | UI per visualizzare analisi strategica. | low |
